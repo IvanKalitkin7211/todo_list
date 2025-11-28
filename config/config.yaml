@@ -4,7 +4,7 @@ server:
     port: 8080        # Порт для HTTP-сервера
 
 database:
-  host: "localhost"      # Хост базы данных
+  host: "postgres"      # Хост базы данных
   port: 5432             # Порт базы данных
   user: "admin"          # Имя пользователя для базы данных
   password: "normalniy"  # Пароль для подключения
