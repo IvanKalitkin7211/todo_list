@@ -1,1 +1,1 @@
-# todo-list
+# todo-list (список задач)
