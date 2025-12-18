@@ -13,6 +13,7 @@ type Config struct {
 	Logger      LoggerConfig
 	Redis       RedisConfig
 	RateLimiter RateLimiterConfig
+	JWTSecret   string `mapstructure:"jwt_secret"`
 }
 type ServersConfig struct {
 	HTTP HTTPConfig `mapstructure:"http"`
@@ -80,6 +81,7 @@ func NewConfig() *Config {
 	_ = viper.BindEnv("rate_limiter.limit", "TODO_RATELIMIT_LIMIT")
 	_ = viper.BindEnv("rate_limiter.windowSeconds", "TODO_RATELIMIT_WINDOW_SECONDS")
 	_ = viper.BindEnv("rate_limiter.errorMessage", "TODO_RATELIMIT_ERROR_MESSAGE")
+	_ = viper.BindEnv("jwt_secret", "TODO_JWT_SECRET")
 
 	// Cfg file
 	viper.SetConfigName("config")
