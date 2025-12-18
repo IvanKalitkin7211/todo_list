@@ -146,7 +146,6 @@ func TestRepository_Features(t *testing.T) {
 		assert.NotEmpty(t, tasksByTag)
 	})
 
-	// 3. Тестируем Статистику (Count)
 	t.Run("Stats", func(t *testing.T) {
 		stats, err := repo.Stats(ctx, userID)
 		assert.NoError(t, err)
