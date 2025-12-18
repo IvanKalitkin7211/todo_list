@@ -9,6 +9,7 @@ import (
 
 type Task struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID    uuid.UUID      `gorm:"type:uuid;not null;index" json:"user_id"`
 	Title     string         `gorm:"type:varchar(255);not null" json:"title"`
 	Content   string         `gorm:"type:text" json:"content"`
 	Status    string         `gorm:"type:varchar(50);default:'todo'" json:"status"`
