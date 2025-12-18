@@ -24,3 +24,5 @@ ratelimiter:
   limit: 100
   windowSeconds: 60
   errorMessage: "Rate limit exceeded, please try again later."
+
+jwt_secret: "super_secret_key_123"
