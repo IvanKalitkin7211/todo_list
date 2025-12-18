@@ -15,7 +15,6 @@ import (
 )
 
 func setupRealDB(t *testing.T) *gorm.DB {
-	// DSN должен соответствовать твоему docker-compose
 	dsn := "host=localhost user=admin password=normalniy dbname=todolist_db sslmode=disable port=5432"
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
@@ -23,14 +22,12 @@ func setupRealDB(t *testing.T) *gorm.DB {
 	})
 
 	if err != nil {
-		t.Fatalf("❌ Не удалось подключиться к тестовой БД: %v. Проверь, запущен ли Docker!", err)
+		t.Fatalf("Не удалось подключиться к тестовой БД: %v. Проверь, запущен ли Docker!", err)
 	}
 
-	// Автомиграция, чтобы таблицы точно существовали
 	err = db.AutoMigrate(&model.User{}, &model.Task{}, &model.Tag{})
 	require.NoError(t, err)
 
-	// Очистка таблиц перед каждым тестом, чтобы данные не перемешивались
 	db.Exec("TRUNCATE TABLE task_tags CASCADE")
 	db.Exec("TRUNCATE TABLE tasks CASCADE")
 	db.Exec("TRUNCATE TABLE users CASCADE")
@@ -47,7 +44,6 @@ func TestRepository_Integration(t *testing.T) {
 	repo := NewTaskRepository(db)
 	ctx := context.Background()
 
-	// Подготовка: создаем тестового пользователя
 	userID := uuid.New()
 	db.Exec("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)", userID, "test@example.com", "hash")
 
@@ -96,7 +92,6 @@ func TestRepository_GetByID(t *testing.T) {
 	repo := NewTaskRepository(db)
 	ctx := context.Background()
 
-	// Создаем тестовые данные
 	uid := uuid.New()
 	taskID := uuid.New()
 	originalTask := &model.Task{
@@ -108,7 +103,6 @@ func TestRepository_GetByID(t *testing.T) {
 	repo.Create(ctx, originalTask)
 
 	t.Run("Success", func(t *testing.T) {
-		// ВАЖНО: Получаем два значения
 		task, err := repo.GetByID(ctx, taskID.String(), uid.String())
 
 		assert.NoError(t, err)
@@ -119,7 +113,6 @@ func TestRepository_GetByID(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		_, err := repo.GetByID(ctx, uuid.New().String(), uid.String())
 
-		// GORM возвращает ErrRecordNotFound для .First()
 		assert.Error(t, err)
 		assert.Equal(t, gorm.ErrRecordNotFound, err)
 	})
@@ -132,7 +125,6 @@ func TestRepository_Features(t *testing.T) {
 	uid := uuid.New()
 	userID := uid.String()
 
-	// 1. Тестируем Поиск (ILIKE)
 	t.Run("Search", func(t *testing.T) {
 		repo.Create(ctx, &model.Task{ID: uuid.New(), UserID: uid, Title: "Купить молоко"})
 
@@ -141,17 +133,14 @@ func TestRepository_Features(t *testing.T) {
 		assert.NotEmpty(t, results)
 	})
 
-	// 2. Тестируем Теги (Association)
 	t.Run("Tags", func(t *testing.T) {
 		task := &model.Task{ID: uuid.New(), UserID: uid, Title: "Task with Tag"}
 		repo.Create(ctx, task)
 
-		// Добавляем тег
 		updated, err := repo.AddTag(ctx, task.ID.String(), "urgent", userID)
 		assert.NoError(t, err)
 		assert.Len(t, updated.Tags, 1)
 
-		// Ищем по тегу
 		tasksByTag, err := repo.FindByTag(ctx, "urgent", userID)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, tasksByTag)
@@ -174,10 +163,8 @@ func TestRepository_TimeQueries(t *testing.T) {
 
 	t.Run("GetToday_And_Overdue", func(t *testing.T) {
 		now := time.Now()
-		// Задача на сегодня
 		repo.Create(ctx, &model.Task{ID: uuid.New(), UserID: uid, Title: "Today", DueDate: &now, Status: "todo"})
 
-		// Просроченная задача (вчерашняя)
 		yesterday := now.AddDate(0, 0, -1)
 		repo.Create(ctx, &model.Task{ID: uuid.New(), UserID: uid, Title: "Old", DueDate: &yesterday, Status: "todo"})
 
