@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/labstack/echo/v4"
+	"net/http"
+	"time"
 	"todo-list/internal/api/dto"
 	"todo-list/internal/domain/service"
 )
@@ -16,7 +14,6 @@ type TaskHandler interface {
 	Get(c echo.Context) error
 	Update(c echo.Context) error
 	Delete(c echo.Context) error
-
 	ChangeStatus(c echo.Context) error
 	ListByStatus(c echo.Context) error
 	Search(c echo.Context) error
@@ -42,19 +39,20 @@ func NewTaskHandler(s service.TaskService) TaskHandler {
 	return &taskHandlerImpl{service: s}
 }
 
+func (h *taskHandlerImpl) getUserID(c echo.Context) string {
+	return c.Get("user_id").(string)
+}
+
 func (h *taskHandlerImpl) Create(c echo.Context) error {
 	var req dto.TaskRequestDTO
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
+	c.Bind(&req)
 	var due *time.Time
 	if req.DueDate != "" {
 		if t, err := time.Parse(time.RFC3339, req.DueDate); err == nil {
 			due = &t
 		}
 	}
-	ctx := c.Request().Context()
-	task, err := h.service.CreateTask(ctx, req.Title, req.Content, req.Status, req.Priority, due)
+	task, err := h.service.CreateTask(c.Request().Context(), h.getUserID(c), req.Title, req.Content, req.Status, req.Priority, due)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -62,8 +60,7 @@ func (h *taskHandlerImpl) Create(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) List(c echo.Context) error {
-	ctx := c.Request().Context()
-	tasks, err := h.service.GetAllTasks(ctx)
+	tasks, err := h.service.GetAllTasks(c.Request().Context(), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -75,12 +72,7 @@ func (h *taskHandlerImpl) List(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) Get(c echo.Context) error {
-	id := c.Param("id")
-	if id == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing id"})
-	}
-	ctx := c.Request().Context()
-	task, err := h.service.GetTaskByID(ctx, id)
+	task, err := h.service.GetTaskByID(c.Request().Context(), c.Param("id"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 	}
@@ -88,22 +80,15 @@ func (h *taskHandlerImpl) Get(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) Update(c echo.Context) error {
-	id := c.Param("id")
-	if id == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing id"})
-	}
 	var req dto.TaskRequestDTO
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
+	c.Bind(&req)
 	var due *time.Time
 	if req.DueDate != "" {
 		if t, err := time.Parse(time.RFC3339, req.DueDate); err == nil {
 			due = &t
 		}
 	}
-	ctx := c.Request().Context()
-	task, err := h.service.UpdateTask(ctx, id, req.Title, req.Content, req.Status, req.Priority, due)
+	task, err := h.service.UpdateTask(c.Request().Context(), c.Param("id"), h.getUserID(c), req.Title, req.Content, req.Status, req.Priority, due)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -111,27 +96,19 @@ func (h *taskHandlerImpl) Update(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) Delete(c echo.Context) error {
-	id := c.Param("id")
-	if id == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing id"})
-	}
-	ctx := c.Request().Context()
-	if err := h.service.DeleteTask(ctx, id); err != nil {
+	err := h.service.DeleteTask(c.Request().Context(), c.Param("id"), h.getUserID(c))
+	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *taskHandlerImpl) ChangeStatus(c echo.Context) error {
-	id := c.Param("id")
 	var body struct {
 		Status string `json:"status"`
 	}
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
-	ctx := c.Request().Context()
-	task, err := h.service.ChangeStatus(ctx, id, body.Status)
+	c.Bind(&body)
+	task, err := h.service.ChangeStatus(c.Request().Context(), c.Param("id"), h.getUserID(c), body.Status)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -139,9 +116,7 @@ func (h *taskHandlerImpl) ChangeStatus(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) ListByStatus(c echo.Context) error {
-	status := c.Param("status")
-	ctx := c.Request().Context()
-	tasks, err := h.service.GetTasksByStatus(ctx, status)
+	tasks, err := h.service.GetTasksByStatus(c.Request().Context(), c.Param("status"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -153,9 +128,7 @@ func (h *taskHandlerImpl) ListByStatus(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) Search(c echo.Context) error {
-	q := c.QueryParam("q")
-	ctx := c.Request().Context()
-	tasks, err := h.service.SearchTasks(ctx, q)
+	tasks, err := h.service.SearchTasks(c.Request().Context(), c.QueryParam("q"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -167,8 +140,7 @@ func (h *taskHandlerImpl) Search(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) GetToday(c echo.Context) error {
-	ctx := c.Request().Context()
-	tasks, err := h.service.GetTodayTasks(ctx)
+	tasks, err := h.service.GetTodayTasks(c.Request().Context(), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -180,8 +152,7 @@ func (h *taskHandlerImpl) GetToday(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) GetOverdue(c echo.Context) error {
-	ctx := c.Request().Context()
-	tasks, err := h.service.GetOverdueTasks(ctx)
+	tasks, err := h.service.GetOverdueTasks(c.Request().Context(), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -193,9 +164,7 @@ func (h *taskHandlerImpl) GetOverdue(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) Archive(c echo.Context) error {
-	id := c.Param("id")
-	ctx := c.Request().Context()
-	task, err := h.service.ArchiveTask(ctx, id)
+	task, err := h.service.ArchiveTask(c.Request().Context(), c.Param("id"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -203,9 +172,7 @@ func (h *taskHandlerImpl) Archive(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) Unarchive(c echo.Context) error {
-	id := c.Param("id")
-	ctx := c.Request().Context()
-	task, err := h.service.UnarchiveTask(ctx, id)
+	task, err := h.service.UnarchiveTask(c.Request().Context(), c.Param("id"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -213,15 +180,11 @@ func (h *taskHandlerImpl) Unarchive(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) ChangePriority(c echo.Context) error {
-	id := c.Param("id")
 	var body struct {
 		Priority string `json:"priority"`
 	}
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
-	ctx := c.Request().Context()
-	task, err := h.service.ChangePriority(ctx, id, body.Priority)
+	c.Bind(&body)
+	task, err := h.service.ChangePriority(c.Request().Context(), c.Param("id"), h.getUserID(c), body.Priority)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -229,9 +192,7 @@ func (h *taskHandlerImpl) ChangePriority(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) ListByPriority(c echo.Context) error {
-	p := c.Param("priority")
-	ctx := c.Request().Context()
-	tasks, err := h.service.GetTasksByPriority(ctx, p)
+	tasks, err := h.service.GetTasksByPriority(c.Request().Context(), c.Param("priority"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -243,19 +204,11 @@ func (h *taskHandlerImpl) ListByPriority(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) AddTag(c echo.Context) error {
-	id := c.Param("id")
 	var body struct {
 		Tag string `json:"tag"`
 	}
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
-	tag := strings.TrimSpace(body.Tag)
-	if tag == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "tag empty"})
-	}
-	ctx := c.Request().Context()
-	task, err := h.service.AddTag(ctx, id, tag)
+	c.Bind(&body)
+	task, err := h.service.AddTag(c.Request().Context(), c.Param("id"), h.getUserID(c), body.Tag)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -263,13 +216,7 @@ func (h *taskHandlerImpl) AddTag(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) RemoveTag(c echo.Context) error {
-	id := c.Param("id")
-	tag := c.Param("tag")
-	if tag == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing tag"})
-	}
-	ctx := c.Request().Context()
-	task, err := h.service.RemoveTag(ctx, id, tag)
+	task, err := h.service.RemoveTag(c.Request().Context(), c.Param("id"), h.getUserID(c), c.Param("tag"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -277,9 +224,7 @@ func (h *taskHandlerImpl) RemoveTag(c echo.Context) error {
 }
 
 func (h *taskHandlerImpl) ListByTag(c echo.Context) error {
-	tag := c.Param("tag")
-	ctx := c.Request().Context()
-	tasks, err := h.service.GetTasksByTag(ctx, tag)
+	tasks, err := h.service.GetTasksByTag(c.Request().Context(), c.Param("tag"), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -294,11 +239,9 @@ func (h *taskHandlerImpl) BulkDelete(c echo.Context) error {
 	var body struct {
 		IDs []string `json:"ids"`
 	}
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
-	ctx := c.Request().Context()
-	if err := h.service.BulkDelete(ctx, body.IDs); err != nil {
+	c.Bind(&body)
+	err := h.service.BulkDelete(c.Request().Context(), body.IDs, h.getUserID(c))
+	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -309,21 +252,19 @@ func (h *taskHandlerImpl) BulkUpdateStatus(c echo.Context) error {
 		IDs    []string `json:"ids"`
 		Status string   `json:"status"`
 	}
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
-	ctx := c.Request().Context()
-	if err := h.service.BulkUpdateStatus(ctx, body.IDs, body.Status); err != nil {
+
+	c.Bind(&body)
+	err := h.service.BulkUpdateStatus(c.Request().Context(), body.IDs, body.Status, h.getUserID(c))
+	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *taskHandlerImpl) Stats(c echo.Context) error {
-	ctx := c.Request().Context()
-	stats, err := h.service.Stats(ctx)
+	s, err := h.service.Stats(c.Request().Context(), h.getUserID(c))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, stats)
+	return c.JSON(http.StatusOK, s)
 }
