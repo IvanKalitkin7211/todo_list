@@ -46,7 +46,10 @@ func createConnection(cfg *config.DatabaseConfig) (*PostgresDB, error) {
 	return &PostgresDB{db: db}, nil
 }
 
-func (p *PostgresDB) GetDB() *gorm.DB { return p.db }
+func (p *PostgresDB) GetDB() *gorm.DB {
+	return p.db
+}
+
 func (p *PostgresDB) Close() error {
 	conn, err := p.db.DB()
 	if err != nil {

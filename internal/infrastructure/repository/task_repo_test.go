@@ -213,3 +213,71 @@ func TestRepository_Archive(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.Archived)
 }
+
+func TestRepository_CRUD_Operations(t *testing.T) {
+	db := setupRealDB(t)
+	repo := NewTaskRepository(db)
+	ctx := context.Background()
+	uid := uuid.New()
+
+	t.Run("Update_Task_And_Associations", func(t *testing.T) {
+		tid := uuid.New()
+		task := &model.Task{ID: tid, UserID: uid, Title: "Original"}
+		repo.Create(ctx, task)
+
+		task.Title = "Updated Title"
+		err := repo.Update(ctx, task)
+		assert.NoError(t, err)
+
+		saved, _ := repo.GetByID(ctx, tid.String(), uid.String())
+		assert.Equal(t, "Updated Title", saved.Title)
+	})
+
+	t.Run("Delete_Task_Success", func(t *testing.T) {
+		tid := uuid.New()
+		repo.Create(ctx, &model.Task{ID: tid, UserID: uid})
+
+		err := repo.Delete(ctx, tid.String(), uid.String())
+		assert.NoError(t, err)
+
+		_, err = repo.GetByID(ctx, tid.String(), uid.String())
+		assert.Error(t, err)
+	})
+}
+
+func TestRepository_Filtering_And_Tags(t *testing.T) {
+	db := setupRealDB(t)
+	repo := NewTaskRepository(db)
+	ctx := context.Background()
+	uid := uuid.New()
+	userID := uid.String()
+
+	t.Run("GetAll_And_Filters", func(t *testing.T) {
+		repo.Create(ctx, &model.Task{ID: uuid.New(), UserID: uid, Status: "todo", Priority: "low"})
+		repo.Create(ctx, &model.Task{ID: uuid.New(), UserID: uid, Status: "done", Priority: "high"})
+
+		// Test GetAll
+		all, _ := repo.GetAll(ctx, userID)
+		assert.Len(t, all, 2)
+
+		// Test FindByStatus
+		todoTasks, _ := repo.FindByStatus(ctx, "todo", userID)
+		assert.Len(t, todoTasks, 1)
+		assert.Equal(t, "todo", todoTasks[0].Status)
+
+		// Test FindByPriority
+		highTasks, _ := repo.FindByPriority(ctx, "high", userID)
+		assert.Len(t, highTasks, 1)
+		assert.Equal(t, "high", highTasks[0].Priority)
+	})
+
+	t.Run("RemoveTag_Integration", func(t *testing.T) {
+		tid := uuid.New()
+		repo.Create(ctx, &model.Task{ID: tid, UserID: uid, Title: "Tag Task"})
+		repo.AddTag(ctx, tid.String(), "temporary", userID)
+
+		res, err := repo.RemoveTag(ctx, tid.String(), "temporary", userID)
+		assert.NoError(t, err)
+		assert.Len(t, res.Tags, 0)
+	})
+}

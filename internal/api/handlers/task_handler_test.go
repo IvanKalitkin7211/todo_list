@@ -192,4 +192,148 @@ func TestHandler_Complete(t *testing.T) {
 		mockSvc.On("GetTasksByTag", mock.Anything, "work", uID).Return([]model.Task{{Title: "T"}}, nil).Once()
 		assert.NoError(t, h.ListByTag(cTag))
 	})
+
+	t.Run("Get_Task_ByID_Success", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/tasks/123", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/v1/tasks/:id")
+		c.SetParamNames("id")
+		c.SetParamValues("123")
+		c.Set("user_id", uID)
+
+		mockSvc.On("GetTaskByID", mock.Anything, "123", uID).
+			Return(model.Task{Title: "Specific Task"}, nil).Once()
+
+		if assert.NoError(t, h.Get(c)) {
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Contains(t, rec.Body.String(), "Specific Task")
+		}
+	})
+
+	t.Run("Update_Task_Success", func(t *testing.T) {
+		body := `{"title":"New Name","priority":"high"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/tasks/123", strings.NewReader(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/v1/tasks/:id")
+		c.SetParamNames("id")
+		c.SetParamValues("123")
+		c.Set("user_id", uID)
+
+		mockSvc.On("UpdateTask", mock.Anything, "123", uID, "New Name", "", "", "high", mock.Anything).
+			Return(model.Task{Title: "New Name"}, nil).Once()
+
+		if assert.NoError(t, h.Update(c)) {
+			assert.Equal(t, http.StatusOK, rec.Code)
+		}
+	})
+
+	t.Run("ChangeStatus_Handler_Success", func(t *testing.T) {
+		body := `{"status":"in_progress"}`
+		req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/v1/tasks/:id/status")
+		c.SetParamNames("id")
+		c.SetParamValues("123")
+		c.Set("user_id", uID)
+
+		mockSvc.On("ChangeStatus", mock.Anything, "123", uID, "in_progress").
+			Return(model.Task{Status: "in_progress"}, nil).Once()
+
+		if assert.NoError(t, h.ChangeStatus(c)) {
+			assert.Equal(t, http.StatusOK, rec.Code)
+		}
+	})
+
+	t.Run("GetToday_and_Overdue_Handlers", func(t *testing.T) {
+		// Today
+		reqT := httptest.NewRequest(http.MethodGet, "/api/v1/tasks/today", nil)
+		recT := httptest.NewRecorder()
+		cT := e.NewContext(reqT, recT)
+		cT.Set("user_id", uID)
+		mockSvc.On("GetTodayTasks", mock.Anything, uID).Return([]model.Task{{Title: "Today"}}, nil).Once()
+
+		assert.NoError(t, h.GetToday(cT))
+		assert.Equal(t, http.StatusOK, recT.Code)
+
+		// Overdue
+		reqO := httptest.NewRequest(http.MethodGet, "/api/v1/tasks/overdue", nil)
+		recO := httptest.NewRecorder()
+		cO := e.NewContext(reqO, recO)
+		cO.Set("user_id", uID)
+		mockSvc.On("GetOverdueTasks", mock.Anything, uID).Return([]model.Task{{Title: "Late"}}, nil).Once()
+
+		assert.NoError(t, h.GetOverdue(cO))
+		assert.Equal(t, http.StatusOK, recO.Code)
+	})
+
+	t.Run("Unarchive_Handler_Success", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/v1/tasks/:id/unarchive")
+		c.SetParamNames("id")
+		c.SetParamValues("123")
+		c.Set("user_id", uID)
+
+		mockSvc.On("UnarchiveTask", mock.Anything, "123", uID).
+			Return(model.Task{Status: "todo"}, nil).Once()
+
+		if assert.NoError(t, h.Unarchive(c)) {
+			assert.Equal(t, http.StatusOK, rec.Code)
+		}
+	})
+
+	t.Run("ListByPriority_Handler", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/v1/tasks/priority/:priority")
+		c.SetParamNames("priority")
+		c.SetParamValues("high")
+		c.Set("user_id", uID)
+
+		mockSvc.On("GetTasksByPriority", mock.Anything, "high", uID).
+			Return([]model.Task{{Priority: "high"}}, nil).Once()
+
+		if assert.NoError(t, h.ListByPriority(c)) {
+			assert.Equal(t, http.StatusOK, rec.Code)
+		}
+	})
+
+	t.Run("RemoveTag_Handler_Success", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/v1/tasks/:id/tags/:tag")
+		c.SetParamNames("id", "tag")
+		c.SetParamValues("123", "work")
+		c.Set("user_id", uID)
+
+		mockSvc.On("RemoveTag", mock.Anything, "123", uID, "work").
+			Return(model.Task{Title: "T"}, nil).Once()
+
+		if assert.NoError(t, h.RemoveTag(c)) {
+			assert.Equal(t, http.StatusOK, rec.Code)
+		}
+	})
+
+	t.Run("BulkDelete_Handler_Success", func(t *testing.T) {
+		body := `{"ids":["10","20"]}`
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("user_id", uID)
+
+		mockSvc.On("BulkDelete", mock.Anything, []string{"10", "20"}, uID).Return(nil).Once()
+
+		if assert.NoError(t, h.BulkDelete(c)) {
+			assert.Equal(t, http.StatusNoContent, rec.Code)
+		}
+	})
 }

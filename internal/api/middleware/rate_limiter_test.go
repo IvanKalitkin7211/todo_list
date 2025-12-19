@@ -48,7 +48,6 @@ func TestRateLimiterMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		// Настраиваем мок для Pipeline
 		redisKey := "rate_limit_192.168.1.1"
 		mock.ExpectTxPipeline()
 		mock.ExpectIncr(redisKey).SetVal(1)

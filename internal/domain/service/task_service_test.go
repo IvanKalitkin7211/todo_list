@@ -130,4 +130,67 @@ func TestTaskService_FullSuite(t *testing.T) {
 		_, err = svc.GetTodayTasks(ctx, uID)
 		assert.NoError(t, err)
 	})
+
+	t.Run("GetAllTasks_Success", func(t *testing.T) {
+		repo.On("GetAll", ctx, uID).Return([]model.Task{{Title: "Task 1"}, {Title: "Task 2"}}, nil).Once()
+		res, err := svc.GetAllTasks(ctx, uID)
+		assert.NoError(t, err)
+		assert.Len(t, res, 2)
+	})
+
+	t.Run("UpdateTask_Success", func(t *testing.T) {
+		tID := uuid.New().String()
+		existingTask := model.Task{Title: "Old Title", UserID: uuid.New()}
+
+		repo.On("GetByID", ctx, tID, uID).Return(existingTask, nil).Once()
+		repo.On("Update", ctx, mock.MatchedBy(func(task *model.Task) bool {
+			return task.Title == "New Title" && task.Priority == "high"
+		})).Return(nil).Once()
+
+		res, err := svc.UpdateTask(ctx, tID, uID, "New Title", "New Content", "done", "high", nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "New Title", res.Title)
+		assert.Equal(t, "high", res.Priority)
+	})
+
+	t.Run("DeleteTask_Execute", func(t *testing.T) {
+		tID := uuid.New().String()
+		repo.On("Delete", ctx, tID, uID).Return(nil).Once()
+		err := svc.DeleteTask(ctx, tID, uID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ChangeStatus_Success", func(t *testing.T) {
+		tID := uuid.New().String()
+		repo.On("GetByID", ctx, tID, uID).Return(model.Task{Status: "todo"}, nil).Once()
+		repo.On("Update", ctx, mock.MatchedBy(func(task *model.Task) bool {
+			return task.Status == "in_progress"
+		})).Return(nil).Once()
+
+		res, err := svc.ChangeStatus(ctx, tID, uID, "in_progress")
+		assert.NoError(t, err)
+		assert.Equal(t, "in_progress", res.Status)
+	})
+
+	t.Run("GetOverdueTasks_Success", func(t *testing.T) {
+		repo.On("GetOverdue", ctx, uID).Return([]model.Task{{Title: "Late Task"}}, nil).Once()
+		res, err := svc.GetOverdueTasks(ctx, uID)
+		assert.NoError(t, err)
+		assert.Len(t, res, 1)
+	})
+
+	t.Run("GetTasksByPriority_Success", func(t *testing.T) {
+		repo.On("FindByPriority", ctx, "high", uID).Return([]model.Task{{Priority: "high"}}, nil).Once()
+		res, err := svc.GetTasksByPriority(ctx, "high", uID)
+		assert.NoError(t, err)
+		assert.Equal(t, "high", res[0].Priority)
+	})
+
+	t.Run("GetTasksByTag_Success", func(t *testing.T) {
+		tagName := "work"
+		repo.On("FindByTag", ctx, tagName, uID).Return([]model.Task{{Title: "Job"}}, nil).Once()
+		res, err := svc.GetTasksByTag(ctx, tagName, uID)
+		assert.NoError(t, err)
+		assert.Len(t, res, 1)
+	})
 }

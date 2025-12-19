@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// 1. Создаем мок для интерфейса TaskHandler
 type mockTaskHandler struct{}
 
 // Реализуем ВСЕ методы, которые используются в NewRouter

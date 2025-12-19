@@ -29,7 +29,6 @@ func AuthMiddleware(secret string) echo.MiddlewareFunc {
 				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token claims"})
 			}
 
-			// Устанавливаем user_id в контекст для использования в хендлерах
 			c.Set("user_id", claims["sub"])
 			return next(c)
 		}

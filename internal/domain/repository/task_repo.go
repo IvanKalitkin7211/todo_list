@@ -5,7 +5,6 @@ import (
 	"todo-list/internal/domain/model"
 )
 
-// TaskRepository — интерфейс для репозитория задач
 type TaskRepository interface {
 	Create(ctx context.Context, task *model.Task) error
 	GetAll(ctx context.Context, userID string) ([]model.Task, error)
